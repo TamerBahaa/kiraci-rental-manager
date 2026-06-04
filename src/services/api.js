@@ -124,10 +124,9 @@ const generateContractPayments = async (contract) => {
 export const getPayments = async (uid, filters = {}) => {
   let q = supabase
     .from('payments')
-    .select('*, contracts(currency, units(unit_number, building), tenants(name, phone))')
+    .select('*, contracts(currency, units(unit_number, building, owners(name)), tenants(name, phone))')
     .eq('user_id', uid)
     .order('due_date', { ascending: false })
-  if (filters.status) q = q.eq('status', filters.status)
   if (filters.contractId) q = q.eq('contract_id', filters.contractId)
   const { data, error } = await q
   if (error) throw error

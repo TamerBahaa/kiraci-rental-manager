@@ -10,11 +10,11 @@ import toast from 'react-hot-toast'
 
 export default function Payments() {
   const { user } = useAuth()
-  const [payments, setPayments] = useState([])
+  const [allPayments, setAllPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [searchParams, setSearchParams] = useSearchParams()
-  const [stFilter, setStFilter] = useState(searchParams.get('status') || 'pending')
+  const [stFilter, setStFilter] = useState(searchParams.get('status') || 'overdue')
   const [markModal, setMarkModal] = useState(null)
   const [markForm, setMarkForm] = useState({ paid_date: format(new Date(), 'yyyy-MM-dd'), payment_method: 'Bank Transfer (EFT)', notes: '' })
   const [marking, setMarking] = useState(false)
@@ -23,10 +23,11 @@ export default function Payments() {
     setLoading(true)
     try {
       await refreshOverdue(user.id)
-      setPayments(await getPayments(user.id, { status: stFilter || undefined }))
+      // Fetch ALL payments — we filter client-side so tab counts are always accurate
+      setAllPayments(await getPayments(user.id))
     } catch { toast.error('Load failed') }
     finally { setLoading(false) }
-  }, [user.id, stFilter])
+  }, [user.id])
 
   useEffect(() => { load() }, [load])
 
@@ -47,28 +48,36 @@ export default function Payments() {
     finally { setMarking(false) }
   }
 
+  // Tab counts always from full dataset
   const counts = {
-    all: payments.length,
-    overdue: payments.filter(p => p.status === 'overdue').length,
-    pending: payments.filter(p => p.status === 'pending').length,
-    upcoming: payments.filter(p => p.status === 'upcoming').length,
-    paid: payments.filter(p => p.status === 'paid').length,
+    '': allPayments.length,
+    overdue: allPayments.filter(p => p.status === 'overdue').length,
+    pending: allPayments.filter(p => p.status === 'pending').length,
+    upcoming: allPayments.filter(p => p.status === 'upcoming').length,
+    paid: allPayments.filter(p => p.status === 'paid').length,
   }
 
-  const filtered = payments.filter(p => {
+  // Client-side filtering
+  const filtered = allPayments.filter(p => {
+    const statusMatch = !stFilter || p.status === stFilter
     const q = search.toLowerCase()
-    return !q || p.contracts?.units?.unit_number?.toLowerCase().includes(q) || p.contracts?.tenants?.name?.toLowerCase().includes(q)
+    const searchMatch = !q
+      || p.contracts?.units?.unit_number?.toLowerCase().includes(q)
+      || p.contracts?.tenants?.name?.toLowerCase().includes(q)
+      || p.contracts?.units?.owners?.name?.toLowerCase().includes(q)
+      || p.contracts?.units?.building?.toLowerCase().includes(q)
+    return statusMatch && searchMatch
   })
 
   const totalAmt = filtered.reduce((s, p) => s + p.amount, 0)
   const paidAmt = filtered.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
 
   const tabs = [
-    { key: 'overdue', label: 'Overdue', color: 'text-red-600 border-red-600' },
-    { key: 'pending', label: 'Pending', color: 'text-amber-600 border-amber-600' },
-    { key: 'upcoming', label: 'Upcoming', color: 'text-blue-600 border-blue-600' },
-    { key: 'paid', label: 'Paid', color: 'text-emerald-600 border-emerald-600' },
-    { key: '', label: 'All', color: 'text-slate-600 border-slate-600' },
+    { key: 'overdue',  label: 'Overdue',  color: 'text-red-600 border-red-500' },
+    { key: 'pending',  label: 'Pending',  color: 'text-amber-600 border-amber-500' },
+    { key: 'upcoming', label: 'Upcoming', color: 'text-blue-600 border-blue-500' },
+    { key: 'paid',     label: 'Paid',     color: 'text-emerald-600 border-emerald-500' },
+    { key: '',         label: 'All',      color: 'text-slate-600 border-slate-500' },
   ]
 
   return (
@@ -82,25 +91,28 @@ export default function Payments() {
       </div>
 
       {/* Status Tabs */}
-      <div className="flex gap-1 border-b border-slate-200">
+      <div className="flex gap-0 border-b border-slate-200">
         {tabs.map(tab => (
           <button key={tab.key}
             onClick={() => { setStFilter(tab.key); setSearchParams(tab.key ? { status: tab.key } : {}) }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all flex items-center gap-1.5 ${
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all flex items-center gap-1.5 whitespace-nowrap ${
               stFilter === tab.key ? `${tab.color}` : 'text-slate-400 border-transparent hover:text-slate-600'
             }`}>
             {tab.label}
-            <span className={`text-xs px-1.5 py-0.5 rounded-full ${stFilter === tab.key ? 'bg-current/10' : 'bg-slate-100 text-slate-500'}`}>
-              {counts[tab.key] ?? payments.length}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+              stFilter === tab.key ? 'bg-current/10' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {counts[tab.key] ?? 0}
             </span>
           </button>
         ))}
       </div>
 
-      <div className="flex gap-2 items-center">
+      {/* Search + Summary */}
+      <div className="flex gap-3 items-center">
         <div className="relative flex-1">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-8 text-sm" placeholder="Search unit or tenant…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input pl-8 text-sm" placeholder="Search by unit, tenant, owner, block…" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {filtered.length > 0 && (
           <div className="flex gap-4 px-4 py-2 bg-white rounded-xl border border-slate-100 text-sm flex-shrink-0">
@@ -110,12 +122,14 @@ export default function Payments() {
         )}
       </div>
 
+      {/* Table */}
       {loading ? <Spin /> : (
         <div className="card overflow-hidden">
           <table className="w-full">
             <thead className="border-b border-slate-100 bg-slate-50/60">
               <tr>
                 <th className="th">Unit</th>
+                <th className="th">Owner</th>
                 <th className="th">Tenant</th>
                 <th className="th">Due Date</th>
                 <th className="th">Amount</th>
@@ -127,14 +141,18 @@ export default function Payments() {
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-12 text-slate-300">
-                  <CreditCard size={28} className="mx-auto mb-2" /><p className="text-sm">No payments found</p>
+                <tr><td colSpan={9} className="text-center py-12 text-slate-300">
+                  <CreditCard size={28} className="mx-auto mb-2" />
+                  <p className="text-sm">No payments found</p>
                 </td></tr>
               ) : filtered.map(p => (
                 <tr key={p.id} className={`table-row ${p.status === 'overdue' ? 'bg-red-50/40' : ''}`}>
                   <td className="td">
                     <span className="font-bold text-slate-800">{p.contracts?.units?.unit_number}</span>
                     <span className="text-slate-400 text-xs ml-1">Block {p.contracts?.units?.building}</span>
+                  </td>
+                  <td className="td">
+                    <p className="text-sm text-slate-600">{p.contracts?.units?.owners?.name || <span className="text-slate-300">—</span>}</p>
                   </td>
                   <td className="td">
                     <p className="text-sm">{p.contracts?.tenants?.name || '—'}</p>
@@ -157,7 +175,11 @@ export default function Payments() {
                         <CheckCircle2 size={11} /> Mark Received
                       </button>
                     )}
-                    {p.status === 'paid' && <span className="text-xs text-emerald-500 flex items-center gap-1"><CheckCircle2 size={11} /> Done</span>}
+                    {p.status === 'paid' && (
+                      <span className="text-xs text-emerald-500 flex items-center gap-1">
+                        <CheckCircle2 size={11} /> Done
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -171,21 +193,40 @@ export default function Payments() {
         {markModal && (
           <form onSubmit={doMark} className="space-y-4">
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-              <p className="font-bold text-slate-800">Unit {markModal.contracts?.units?.unit_number} · Block {markModal.contracts?.units?.building}</p>
+              <p className="font-bold text-slate-800">
+                Unit {markModal.contracts?.units?.unit_number} · Block {markModal.contracts?.units?.building}
+              </p>
+              {markModal.contracts?.units?.owners?.name && (
+                <p className="text-xs text-slate-500 mt-0.5">Owner: {markModal.contracts.units.owners.name}</p>
+              )}
               <p className="text-sm text-slate-500 mt-0.5">{markModal.contracts?.tenants?.name}</p>
-              <p className="text-2xl font-bold text-emerald-600 mt-2">{fmtCurrency(markModal.amount, markModal.currency)}</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-2">
+                {fmtCurrency(markModal.amount, markModal.currency)}
+              </p>
               <p className="text-xs text-slate-400">Due: {fmt(markModal.due_date)}</p>
             </div>
-            <div><label className="label">Date Received</label><input className="input" type="date" value={markForm.paid_date} onChange={e => setMarkForm(p => ({ ...p, paid_date: e.target.value }))} required /></div>
-            <div><label className="label">Payment Method</label>
-              <select className="input" value={markForm.payment_method} onChange={e => setMarkForm(p => ({ ...p, payment_method: e.target.value }))}>
+            <div>
+              <label className="label">Date Received</label>
+              <input className="input" type="date" value={markForm.paid_date}
+                onChange={e => setMarkForm(p => ({ ...p, paid_date: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="label">Payment Method</label>
+              <select className="input" value={markForm.payment_method}
+                onChange={e => setMarkForm(p => ({ ...p, payment_method: e.target.value }))}>
                 {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
               </select>
             </div>
-            <div><label className="label">Reference / Notes</label><input className="input" value={markForm.notes} onChange={e => setMarkForm(p => ({ ...p, notes: e.target.value }))} placeholder="Transaction ref, remarks…" /></div>
+            <div>
+              <label className="label">Reference / Notes</label>
+              <input className="input" value={markForm.notes}
+                onChange={e => setMarkForm(p => ({ ...p, notes: e.target.value }))}
+                placeholder="Transaction ref, remarks…" />
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setMarkModal(null)} className="btn-secondary">Cancel</button>
-              <button type="submit" disabled={marking} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
+              <button type="submit" disabled={marking}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-60">
                 <CheckCircle2 size={14} /> {marking ? 'Saving…' : 'Confirm Receipt'}
               </button>
             </div>
@@ -196,4 +237,10 @@ export default function Payments() {
   )
 }
 
-function Spin() { return <div className="flex items-center justify-center h-64"><div className="w-7 h-7 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" /></div> }
+function Spin() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-7 h-7 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
