@@ -54,10 +54,10 @@ export default function Reports() {
         const totalPaid = r.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
         const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0
 
-        // Overdue per unit (top defaulters)
+        // Overdue payments — all of them
         const { data: overdueList } = await supabase
           .from('payments')
-          .select('amount, due_date, contracts(units(unit_number, building), tenants(name))')
+          .select('amount, due_date, contracts(units(unit_number, building, owners(name)), tenants(name))')
           .eq('user_id', user.id).eq('status', 'overdue').order('due_date')
 
         setData({
@@ -134,25 +134,43 @@ export default function Reports() {
 
         {/* Overdue List */}
         <div className="card">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-            <AlertTriangle size={15} className="text-red-400" />
-            <h3 className="font-semibold text-slate-700 text-sm">Outstanding Payments</h3>
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={15} className="text-red-400" />
+              <h3 className="font-semibold text-slate-700 text-sm">Overdue — Not Yet Received</h3>
+            </div>
+            {(data?.overdueList?.length || 0) > 0 && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200">
+                {data.overdueList.length} payments
+              </span>
+            )}
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-50 overflow-y-auto" style={{ maxHeight: '420px' }}>
             {data?.overdueList?.length === 0
               ? <div className="px-5 py-8 text-center text-slate-300 text-sm">No overdue payments 🎉</div>
-              : data?.overdueList?.slice(0, 10).map((p, i) => (
+              : data?.overdueList?.map((p, i) => (
               <div key={i} className="px-5 py-3 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-slate-700">
-                    {p.contracts?.units?.unit_number} · {p.contracts?.tenants?.name}
+                    Unit {p.contracts?.units?.unit_number} · {p.contracts?.tenants?.name || '—'}
                   </p>
-                  <p className="text-xs text-slate-400">Due {fmt(p.due_date)}</p>
+                  <p className="text-xs text-slate-400">
+                    {p.contracts?.units?.owners?.name && <span className="text-slate-500 font-medium">{p.contracts.units.owners.name} · </span>}
+                    Due {fmt(p.due_date)}
+                  </p>
                 </div>
-                <p className="font-bold text-red-500">{fmtCurrency(p.amount)}</p>
+                <p className="font-bold text-red-500 ml-4 flex-shrink-0">{fmtCurrency(p.amount)}</p>
               </div>
             ))}
           </div>
+          {(data?.overdueList?.length || 0) > 0 && (
+            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-red-50/50">
+              <span className="text-xs font-semibold text-slate-500">Total overdue</span>
+              <span className="text-sm font-bold text-red-600">
+                {fmtCurrency(data.overdueList.reduce((s, p) => s + p.amount, 0))}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
