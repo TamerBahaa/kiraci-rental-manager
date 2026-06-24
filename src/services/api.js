@@ -144,6 +144,12 @@ export const markPaid = async (id, { paid_date, payment_method, notes }) => {
 
 export const refreshOverdue = async (uid) => {
   const today = format(new Date(), 'yyyy-MM-dd')
+  // Fix: also catch 'upcoming' payments whose due date has now passed
+  // (they were seeded as upcoming but time moved past their due date)
+  await supabase.from('payments').update({ status: 'pending' })
+    .eq('user_id', uid).eq('status', 'upcoming').lte('due_date', today)
+  await supabase.from('payments').update({ status: 'overdue' })
+    .eq('user_id', uid).eq('status', 'upcoming').lt('due_date', today)
   await supabase.from('payments').update({ status: 'overdue' })
     .eq('user_id', uid).eq('status', 'pending').lt('due_date', today)
 }
