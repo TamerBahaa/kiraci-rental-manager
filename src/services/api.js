@@ -282,3 +282,59 @@ export const seedData = async (uid) => {
   }
   return true
 }
+
+// ─── EDIT CONTRACT ─────────────────────────────
+export const updateContract = async (id, uid, updates) => {
+  // 1. Save the updated contract
+  const { data: contract, error } = await supabase
+    .from('contracts')
+    .update({ ...updates, status: 'active' })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+
+  // 2. Mark unit as rented (in case it was expired/vacant)
+  await supabase.from('units').update({ status: 'rented' }).eq('id', contract.unit_id)
+
+  // 3. Delete ALL future unpaid payments so we regenerate clean
+  const today = format(new Date(), 'yyyy-MM-dd')
+  await supabase
+    .from('payments')
+    .delete()
+    .eq('contract_id', id)
+    .in('status', ['pending', 'upcoming'])
+    .gte('due_date', today)
+
+  // 4. If rent amount changed, do NOT touch already paid records
+  //    Just regenerate from today forward with new amount/dates
+  if (contract.end_date && contract.monthly_rent) {
+    const payDay = contract.payment_day || 1
+    const end = parseISO(contract.end_date)
+    const payments = []
+    let cur = new Date(new Date().getFullYear(), new Date().getMonth(), payDay)
+    const todayDate = new Date()
+    // Start from this month or next depending on whether this month's due date passed
+    if (isBefore(cur, todayDate)) cur = addMonths(cur, 0) // keep current month if day hasn't passed
+
+    while (!isBefore(end, cur)) {
+      const dueStr = format(cur, 'yyyy-MM-dd')
+      // Skip if a paid record already exists for this date
+      payments.push({
+        contract_id: id,
+        user_id: uid,
+        due_date: dueStr,
+        amount: contract.monthly_rent,
+        currency: contract.currency || 'TRY',
+        status: isBefore(cur, todayDate) ? 'pending' : 'upcoming',
+      })
+      cur = addMonths(cur, 1)
+    }
+
+    if (payments.length > 0) {
+      await supabase.from('payments').insert(payments)
+    }
+  }
+
+  return contract
+}
