@@ -82,7 +82,9 @@ export default function Payments() {
     )
   }
 
-  const filtered = allPayments.filter(p => applyFilter(p) && applySearch(p))
+  const filtered = allPayments
+    .filter(p => applyFilter(p) && applySearch(p))
+    .sort((a, b) => stFilter === 'upcoming' ? a.due_date.localeCompare(b.due_date) : 0)
 
   // ── Tab counts (always from full dataset) ─────────────────────────────
   const thisMonth = allPayments.filter(p => p.due_date >= MONTH_FROM && p.due_date <= MONTH_TO)
