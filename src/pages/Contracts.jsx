@@ -51,7 +51,7 @@ export default function Contracts() {
       return toast.error('Fill all required fields')
     setSaving(true)
     try {
-      await createContract(user.id, {
+      const newContract = await createContract(user.id, {
         ...form,
         monthly_rent: Number(form.monthly_rent),
         deposit: Number(form.deposit) || 0,
@@ -59,8 +59,15 @@ export default function Contracts() {
         status: 'active',
         end_date: form.end_date || null,
       })
-      toast.success('Contract created — payments generated!')
-      setCreateModal(false); load()
+      toast.success('Contract created — you can now add attachments below')
+      setCreateModal(false)
+      // Reload list, then auto-open view modal so user can attach files immediately
+      const [c, u, t] = await Promise.all([
+        getContracts(user.id), getUnits(user.id), getTenants(user.id),
+      ])
+      setContracts(c); setUnits(u); setTenants(t)
+      const created = c.find(x => x.id === newContract.id)
+      if (created) setViewModal(created)
     } catch (e) { toast.error(e.message) }
     finally { setSaving(false) }
   }
@@ -385,6 +392,8 @@ export default function Contracts() {
               <strong>Note:</strong> Saving will set the contract back to <strong>active</strong>, delete unpaid future payments
               and regenerate them with the new dates and rent amount. Already paid records are kept.
             </div>
+
+            <AttachmentSection entityType="contract" entityId={editModal?.id} />
 
             <div className="flex justify-end gap-2 pt-2">
               <button type="button" onClick={() => setEditModal(null)} className="btn-secondary">Cancel</button>
