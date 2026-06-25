@@ -19,6 +19,7 @@ export default function Owners() {
   const [form, setForm] = useState(blank)
   const [del, setDel] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [newId, setNewId] = useState(null)   // set after creation to show attachment step
 
   const load = async () => {
     try { setOwners(await getOwners(user.id)) }
@@ -27,17 +28,24 @@ export default function Owners() {
   }
   useEffect(() => { load() }, [])
 
-  const openAdd = () => { setForm(blank); setEditId(null); setModal(true) }
-  const openEdit = o => { setForm(o); setEditId(o.id); setModal(true) }
+  const openAdd  = () => { setForm(blank); setEditId(null); setNewId(null); setModal(true) }
+  const openEdit = o  => { setForm(o); setEditId(o.id); setNewId(null); setModal(true) }
+  const closeModal = () => { setModal(false); setNewId(null) }
 
   const save = async (e) => {
     e.preventDefault()
     if (!form.name) return toast.error('Name required')
     setSaving(true)
     try {
-      await saveOwner(user.id, form, editId)
-      toast.success(editId ? 'Owner updated' : 'Owner added')
-      setModal(false); load()
+      const result = await saveOwner(user.id, form, editId)
+      if (editId) {
+        toast.success('Owner updated')
+        closeModal(); load()
+      } else {
+        toast.success('Owner added!')
+        load()                   // reload list in background
+        setNewId(result.id)      // stay in modal → show attachment step
+      }
     } catch (e) { toast.error(e.message) }
     finally { setSaving(false) }
   }
@@ -91,23 +99,43 @@ export default function Owners() {
         ))}
       </div>
 
-      <Modal isOpen={modal} onClose={() => setModal(false)} title={editId ? 'Edit Owner' : 'Add Owner'} size="lg">
-        <form onSubmit={save} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><label className="label">Full Name *</label><input className="input" value={form.name} onChange={f('name')} required /></div>
-            <div><label className="label">Phone / WhatsApp</label><input className="input" value={form.phone} onChange={f('phone')} placeholder="+90 5XX XXX XXXX" /></div>
-            <div><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={f('email')} /></div>
-            <div><label className="label">ID / Passport</label><input className="input" value={form.id_number} onChange={f('id_number')} /></div>
-            <div><label className="label">Nationality</label><input className="input" value={form.nationality} onChange={f('nationality')} /></div>
-            <div className="col-span-2"><label className="label">Bank Account / IBAN</label><input className="input font-mono text-sm" value={form.bank_account} onChange={f('bank_account')} /></div>
-            <div className="col-span-2"><label className="label">Notes</label><textarea className="input resize-none h-16" value={form.notes} onChange={f('notes')} /></div>
+      <Modal isOpen={modal} onClose={closeModal} title={newId ? 'Add Owner — Attachments' : editId ? 'Edit Owner' : 'Add Owner'} size="lg">
+        {newId ? (
+          /* ── Step 2: owner created, show attachments ── */
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+              <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <span className="text-green-600 text-sm font-bold">✓</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700">Owner added successfully!</p>
+                <p className="text-xs text-green-600 mt-0.5">You can now attach ID scans, bank documents, or any other files.</p>
+              </div>
+            </div>
+            <AttachmentSection entityType="owner" entityId={newId} />
+            <div className="flex justify-end pt-2">
+              <button type="button" onClick={closeModal} className="btn-primary">Done</button>
+            </div>
           </div>
-          {editId && <AttachmentSection entityType="owner" entityId={editId} />}
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModal(false)} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Owner'}</button>
-          </div>
-        </form>
+        ) : (
+          /* ── Step 1: fill in the form ── */
+          <form onSubmit={save} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><label className="label">Full Name *</label><input className="input" value={form.name} onChange={f('name')} required /></div>
+              <div><label className="label">Phone / WhatsApp</label><input className="input" value={form.phone} onChange={f('phone')} placeholder="+90 5XX XXX XXXX" /></div>
+              <div><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={f('email')} /></div>
+              <div><label className="label">ID / Passport</label><input className="input" value={form.id_number} onChange={f('id_number')} /></div>
+              <div><label className="label">Nationality</label><input className="input" value={form.nationality} onChange={f('nationality')} /></div>
+              <div className="col-span-2"><label className="label">Bank Account / IBAN</label><input className="input font-mono text-sm" value={form.bank_account} onChange={f('bank_account')} /></div>
+              <div className="col-span-2"><label className="label">Notes</label><textarea className="input resize-none h-16" value={form.notes} onChange={f('notes')} /></div>
+            </div>
+            {editId && <AttachmentSection entityType="owner" entityId={editId} />}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Owner'}</button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Confirm isOpen={!!del} onClose={() => setDel(null)} onConfirm={async () => { try { await deleteOwner(del.id); toast.success('Deleted'); load() } catch { toast.error('Cannot delete — owner has units') } }}

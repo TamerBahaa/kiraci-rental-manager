@@ -20,6 +20,7 @@ export default function Tenants() {
   const [form, setForm] = useState(blank)
   const [del, setDel] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [newId, setNewId] = useState(null)   // set after creation to show attachment step
 
   const load = async () => {
     try { setTenants(await getTenants(user.id)) }
@@ -28,17 +29,24 @@ export default function Tenants() {
   }
   useEffect(() => { load() }, [])
 
-  const openAdd = () => { setForm(blank); setEditId(null); setModal(true) }
-  const openEdit = t => { setForm(t); setEditId(t.id); setModal(true) }
+  const openAdd  = () => { setForm(blank); setEditId(null); setNewId(null); setModal(true) }
+  const openEdit = t  => { setForm(t); setEditId(t.id); setNewId(null); setModal(true) }
+  const closeModal = () => { setModal(false); setNewId(null) }
 
   const save = async (e) => {
     e.preventDefault()
     if (!form.name) return toast.error('Name required')
     setSaving(true)
     try {
-      await saveTenant(user.id, form, editId)
-      toast.success(editId ? 'Tenant updated' : 'Tenant added')
-      setModal(false); load()
+      const result = await saveTenant(user.id, form, editId)
+      if (editId) {
+        toast.success('Tenant updated')
+        closeModal(); load()
+      } else {
+        toast.success('Tenant added!')
+        load()                   // reload list in background
+        setNewId(result.id)      // stay in modal → show attachment step
+      }
     } catch (e) { toast.error(e.message) }
     finally { setSaving(false) }
   }
@@ -99,33 +107,53 @@ export default function Tenants() {
         ))}
       </div>
 
-      <Modal isOpen={modal} onClose={() => setModal(false)} title={editId ? 'Edit Tenant' : 'Add Tenant'} size="lg">
-        <form onSubmit={save} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><label className="label">Full Name *</label><input className="input" value={form.name} onChange={f('name')} required /></div>
-            <div><label className="label">Phone / WhatsApp</label><input className="input" value={form.phone} onChange={f('phone')} placeholder="+90 5XX XXX XXXX" /></div>
-            <div><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={f('email')} /></div>
-            <div><label className="label">ID / Passport</label><input className="input" value={form.id_number} onChange={f('id_number')} /></div>
-            <div><label className="label">Nationality</label>
-              <select className="input" value={form.nationality} onChange={f('nationality')}>
-                {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
-              </select>
+      <Modal isOpen={modal} onClose={closeModal} title={newId ? 'Add Tenant — Attachments' : editId ? 'Edit Tenant' : 'Add Tenant'} size="lg">
+        {newId ? (
+          /* ── Step 2: tenant created, show attachments ── */
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+              <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <span className="text-green-600 text-sm font-bold">✓</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700">Tenant added successfully!</p>
+                <p className="text-xs text-green-600 mt-0.5">You can now attach ID scans, passport copies, or any other documents.</p>
+              </div>
+            </div>
+            <AttachmentSection entityType="tenant" entityId={newId} />
+            <div className="flex justify-end pt-2">
+              <button type="button" onClick={closeModal} className="btn-primary">Done</button>
             </div>
           </div>
-          <div className="border-t border-slate-100 pt-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Emergency Contact (optional)</p>
+        ) : (
+          /* ── Step 1: fill in the form ── */
+          <form onSubmit={save} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="label">Name</label><input className="input" value={form.emergency_contact} onChange={f('emergency_contact')} /></div>
-              <div><label className="label">Phone</label><input className="input" value={form.emergency_phone} onChange={f('emergency_phone')} /></div>
+              <div className="col-span-2"><label className="label">Full Name *</label><input className="input" value={form.name} onChange={f('name')} required /></div>
+              <div><label className="label">Phone / WhatsApp</label><input className="input" value={form.phone} onChange={f('phone')} placeholder="+90 5XX XXX XXXX" /></div>
+              <div><label className="label">Email</label><input className="input" type="email" value={form.email} onChange={f('email')} /></div>
+              <div><label className="label">ID / Passport</label><input className="input" value={form.id_number} onChange={f('id_number')} /></div>
+              <div><label className="label">Nationality</label>
+                <select className="input" value={form.nationality} onChange={f('nationality')}>
+                  {NATIONALITIES.map(n => <option key={n}>{n}</option>)}
+                </select>
+              </div>
             </div>
-          </div>
-          <div><label className="label">Notes</label><textarea className="input resize-none h-14" value={form.notes} onChange={f('notes')} /></div>
-          {editId && <AttachmentSection entityType="tenant" entityId={editId} />}
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModal(false)} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Tenant'}</button>
-          </div>
-        </form>
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Emergency Contact (optional)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="label">Name</label><input className="input" value={form.emergency_contact} onChange={f('emergency_contact')} /></div>
+                <div><label className="label">Phone</label><input className="input" value={form.emergency_phone} onChange={f('emergency_phone')} /></div>
+              </div>
+            </div>
+            <div><label className="label">Notes</label><textarea className="input resize-none h-14" value={form.notes} onChange={f('notes')} /></div>
+            {editId && <AttachmentSection entityType="tenant" entityId={editId} />}
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={closeModal} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Tenant'}</button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Confirm isOpen={!!del} onClose={() => setDel(null)} onConfirm={async () => { try { await deleteTenant(del.id); toast.success('Deleted'); load() } catch { toast.error('Cannot delete — tenant has contracts') } }}

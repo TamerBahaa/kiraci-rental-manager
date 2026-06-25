@@ -30,6 +30,7 @@ export default function Contracts() {
   const [form, setForm] = useState(blank)
   const [editForm, setEditForm] = useState({})
   const [saving, setSaving] = useState(false)
+  const [newContractId, setNewContractId] = useState(null)  // set after creation to show attachment step
 
   const load = async () => {
     try {
@@ -59,17 +60,17 @@ export default function Contracts() {
         status: 'active',
         end_date: form.end_date || null,
       })
-      toast.success('Contract created — you can now add attachments below')
-      setCreateModal(false)
-      // Reload list, then auto-open view modal so user can attach files immediately
-      const [c, u, t] = await Promise.all([
-        getContracts(user.id), getUnits(user.id), getTenants(user.id),
-      ])
-      setContracts(c); setUnits(u); setTenants(t)
-      const created = c.find(x => x.id === newContract.id)
-      if (created) setViewModal(created)
+      toast.success('Contract created!')
+      load()                              // reload list in background
+      setNewContractId(newContract.id)   // stay in modal → show attachment step
     } catch (e) { toast.error(e.message) }
     finally { setSaving(false) }
+  }
+
+  const closeCreateModal = () => {
+    setCreateModal(false)
+    setNewContractId(null)
+    setForm(blank)
   }
 
   // ── Edit ─────────────────────────────────────
@@ -138,7 +139,7 @@ export default function Contracts() {
             {contracts.filter(c => c.status === 'expired').length} expired
           </p>
         </div>
-        <button onClick={() => { setForm(blank); setCreateModal(true) }} className="btn-primary">
+        <button onClick={() => { setForm(blank); setNewContractId(null); setCreateModal(true) }} className="btn-primary">
           <Plus size={14} /> New Contract
         </button>
       </div>
@@ -241,79 +242,99 @@ export default function Contracts() {
       </div>
 
       {/* ── CREATE MODAL ───────────────────────── */}
-      <Modal isOpen={createModal} onClose={() => setCreateModal(false)} title="New Rental Contract" size="lg">
-        <form onSubmit={handleCreate} className="space-y-4">
-          {vacantUnits.length === 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-700">
-              No vacant units available. Terminate an existing contract first.
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Unit (Vacant Only) *</label>
-              <select className="input text-sm" value={form.unit_id} onChange={f('unit_id')} required>
-                <option value="">Select unit…</option>
-                {vacantUnits.map(u => (
-                  <option key={u.id} value={u.id}>{u.unit_number} — Block {u.building}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label">Tenant *</label>
-              <select className="input text-sm" value={form.tenant_id} onChange={f('tenant_id')} required>
-                <option value="">Select tenant…</option>
-                {tenants.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}{t.phone ? ` · ${t.phone}` : ''}</option>
-                ))}
-              </select>
-            </div>
-            <div><label className="label">Start Date *</label>
-              <input className="input" type="date" value={form.start_date} onChange={f('start_date')} required />
-            </div>
-            <div><label className="label">End Date</label>
-              <input className="input" type="date" value={form.end_date} onChange={f('end_date')} />
-            </div>
-            <div>
-              <label className="label">Monthly Rent *</label>
-              <div className="flex gap-2">
-                <input className="input flex-1" type="number" value={form.monthly_rent}
-                  onChange={f('monthly_rent')} placeholder="22000" required />
-                <select className="input w-20" value={form.currency} onChange={f('currency')}>
-                  {CURRENCIES.map(c => <option key={c}>{c}</option>)}
-                </select>
+      <Modal isOpen={createModal} onClose={closeCreateModal} title="New Rental Contract" size="lg">
+        {newContractId ? (
+          /* ── Step 2: contract exists, show attachments ── */
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+              <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                <span className="text-green-600 text-sm font-bold">✓</span>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-green-700">Contract created successfully!</p>
+                <p className="text-xs text-green-600 mt-0.5">Payments have been generated. You can now attach the signed contract document.</p>
               </div>
             </div>
-            <div>
-              <label className="label">Payment Day *</label>
-              <select className="input" value={form.payment_day} onChange={f('payment_day')}>
-                {[1,5,8,10,13,14,15,17,18,20,21,22,23,25,27,28].map(d => (
-                  <option key={d} value={d}>{d}th of month</option>
-                ))}
-              </select>
-            </div>
-            <div><label className="label">Deposit</label>
-              <input className="input" type="number" value={form.deposit} onChange={f('deposit')} />
-            </div>
-            <div className="flex items-center gap-2 pt-5">
-              <input type="checkbox" id="dp" checked={form.deposit_paid}
-                onChange={e => setForm(p => ({ ...p, deposit_paid: e.target.checked }))}
-                className="w-4 h-4 accent-brand-600" />
-              <label htmlFor="dp" className="text-sm text-slate-600 cursor-pointer">Deposit received</label>
-            </div>
-            <div className="col-span-2"><label className="label">Notes</label>
-              <textarea className="input resize-none h-14" value={form.notes} onChange={f('notes')} />
+            <AttachmentSection entityType="contract" entityId={newContractId} />
+            <div className="flex justify-end pt-2">
+              <button type="button" onClick={closeCreateModal} className="btn-primary">Done</button>
             </div>
           </div>
-          <div className="bg-brand-50 border border-brand-100 rounded-lg px-4 py-2.5 text-xs text-brand-700">
-            Creating this contract will automatically mark the unit as <strong>rented</strong> and generate monthly payment records.
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setCreateModal(false)} className="btn-secondary">Cancel</button>
-            <button type="submit" disabled={saving || vacantUnits.length === 0} className="btn-primary">
-              {saving ? 'Creating…' : 'Create Contract'}
-            </button>
-          </div>
-        </form>
+        ) : (
+          /* ── Step 1: fill in the form ── */
+          <form onSubmit={handleCreate} className="space-y-4">
+            {vacantUnits.length === 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-sm text-amber-700">
+                No vacant units available. Terminate an existing contract first.
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Unit (Vacant Only) *</label>
+                <select className="input text-sm" value={form.unit_id} onChange={f('unit_id')} required>
+                  <option value="">Select unit…</option>
+                  {vacantUnits.map(u => (
+                    <option key={u.id} value={u.id}>{u.unit_number} — Block {u.building}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Tenant *</label>
+                <select className="input text-sm" value={form.tenant_id} onChange={f('tenant_id')} required>
+                  <option value="">Select tenant…</option>
+                  {tenants.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}{t.phone ? ` · ${t.phone}` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div><label className="label">Start Date *</label>
+                <input className="input" type="date" value={form.start_date} onChange={f('start_date')} required />
+              </div>
+              <div><label className="label">End Date</label>
+                <input className="input" type="date" value={form.end_date} onChange={f('end_date')} />
+              </div>
+              <div>
+                <label className="label">Monthly Rent *</label>
+                <div className="flex gap-2">
+                  <input className="input flex-1" type="number" value={form.monthly_rent}
+                    onChange={f('monthly_rent')} placeholder="22000" required />
+                  <select className="input w-20" value={form.currency} onChange={f('currency')}>
+                    {CURRENCIES.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">Payment Day *</label>
+                <select className="input" value={form.payment_day} onChange={f('payment_day')}>
+                  {[1,5,8,10,13,14,15,17,18,20,21,22,23,25,27,28].map(d => (
+                    <option key={d} value={d}>{d}th of month</option>
+                  ))}
+                </select>
+              </div>
+              <div><label className="label">Deposit</label>
+                <input className="input" type="number" value={form.deposit} onChange={f('deposit')} />
+              </div>
+              <div className="flex items-center gap-2 pt-5">
+                <input type="checkbox" id="dp" checked={form.deposit_paid}
+                  onChange={e => setForm(p => ({ ...p, deposit_paid: e.target.checked }))}
+                  className="w-4 h-4 accent-brand-600" />
+                <label htmlFor="dp" className="text-sm text-slate-600 cursor-pointer">Deposit received</label>
+              </div>
+              <div className="col-span-2"><label className="label">Notes</label>
+                <textarea className="input resize-none h-14" value={form.notes} onChange={f('notes')} />
+              </div>
+            </div>
+            <div className="bg-brand-50 border border-brand-100 rounded-lg px-4 py-2.5 text-xs text-brand-700">
+              Creating this contract will automatically mark the unit as <strong>rented</strong> and generate monthly payment records.
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button type="button" onClick={closeCreateModal} className="btn-secondary">Cancel</button>
+              <button type="submit" disabled={saving || vacantUnits.length === 0} className="btn-primary">
+                {saving ? 'Creating…' : 'Create Contract'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* ── EDIT / RENEW MODAL ─────────────────── */}
