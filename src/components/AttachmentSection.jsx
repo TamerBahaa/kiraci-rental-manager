@@ -200,23 +200,23 @@ export default function AttachmentSection({ entityType, entityId }) {
               {confirmId === item.id ? (
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span className="text-[11px] text-red-500 font-medium">Delete?</span>
-                  <button onClick={handleDelete}
+                  <button type="button" onClick={handleDelete}
                     className="text-[11px] font-semibold text-red-600 hover:text-red-700 px-1.5 py-0.5 rounded bg-red-50 hover:bg-red-100 transition-colors">
                     Yes
                   </button>
-                  <button onClick={() => setConfirmId(null)}
+                  <button type="button" onClick={() => setConfirmId(null)}
                     className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 transition-colors">
                     No
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button onClick={() => handleDownload(item)}
+                  <button type="button" onClick={() => handleDownload(item)}
                     className="p-1.5 rounded hover:bg-white text-slate-400 hover:text-brand-600 transition-colors"
                     title="Download">
                     <Download size={13} />
                   </button>
-                  <button onClick={() => confirmDelete(item.id)}
+                  <button type="button" onClick={() => confirmDelete(item.id)}
                     className="p-1.5 rounded hover:bg-white text-slate-400 hover:text-red-500 transition-colors"
                     title="Delete">
                     <Trash2 size={13} />
