@@ -283,6 +283,60 @@ export const seedData = async (uid) => {
   return true
 }
 
+// ─── ATTACHMENTS ───────────────────────────────
+const BUCKET = 'kiraci-attachments'
+
+export const getAttachments = async (entityType, entityId) => {
+  const { data, error } = await supabase
+    .from('attachments')
+    .select('*')
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export const uploadAttachment = async (uid, entityType, entityId, file) => {
+  const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const path = `${uid}/${entityType}/${entityId}/${Date.now()}_${safeFileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false })
+  if (uploadError) throw uploadError
+
+  const { data, error } = await supabase.from('attachments').insert({
+    user_id: uid,
+    entity_type: entityType,
+    entity_id: entityId,
+    file_name: file.name,
+    file_path: path,
+    file_size: file.size,
+    mime_type: file.type,
+  }).select().single()
+
+  if (error) {
+    await supabase.storage.from(BUCKET).remove([path])
+    throw error
+  }
+  return data
+}
+
+export const deleteAttachment = async (id, filePath) => {
+  await supabase.storage.from(BUCKET).remove([filePath])
+  const { error } = await supabase.from('attachments').delete().eq('id', id)
+  if (error) throw error
+}
+
+export const getAttachmentUrl = async (filePath) => {
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(filePath, 3600)
+  if (error) throw error
+  return data.signedUrl
+}
+
 // ─── EDIT CONTRACT ─────────────────────────────
 export const updateContract = async (id, uid, updates) => {
   // 1. Save the updated contract

@@ -4,8 +4,9 @@ import { getTenants, saveTenant, deleteTenant } from '../services/api'
 import { NATIONALITIES } from '../utils/helpers'
 import Modal from '../components/Modal'
 import Confirm from '../components/Confirm'
-import { Plus, Search, Users, Pencil, Trash2, Phone, Mail, Shield } from 'lucide-react'
+import { Plus, Search, Users, Pencil, Trash2, Phone, Mail, Shield, Paperclip } from 'lucide-react'
 import toast from 'react-hot-toast'
+import AttachmentSection from '../components/AttachmentSection'
 
 const blank = { name: '', phone: '', email: '', id_number: '', nationality: 'Turkish', emergency_contact: '', emergency_phone: '', notes: '' }
 
@@ -119,6 +120,7 @@ export default function Tenants() {
             </div>
           </div>
           <div><label className="label">Notes</label><textarea className="input resize-none h-14" value={form.notes} onChange={f('notes')} /></div>
+          {editId && <AttachmentSection entityType="tenant" entityId={editId} />}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModal(false)} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Tenant'}</button>

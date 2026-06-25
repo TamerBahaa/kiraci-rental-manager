@@ -3,8 +3,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { getOwners, saveOwner, deleteOwner } from '../services/api'
 import Modal from '../components/Modal'
 import Confirm from '../components/Confirm'
-import { Plus, Search, Home, Pencil, Trash2, Phone, Mail } from 'lucide-react'
+import { Plus, Search, Home, Pencil, Trash2, Phone, Mail, Paperclip } from 'lucide-react'
 import toast from 'react-hot-toast'
+import AttachmentSection from '../components/AttachmentSection'
 
 const blank = { name: '', phone: '', email: '', id_number: '', nationality: '', bank_account: '', notes: '' }
 
@@ -90,7 +91,7 @@ export default function Owners() {
         ))}
       </div>
 
-      <Modal isOpen={modal} onClose={() => setModal(false)} title={editId ? 'Edit Owner' : 'Add Owner'}>
+      <Modal isOpen={modal} onClose={() => setModal(false)} title={editId ? 'Edit Owner' : 'Add Owner'} size="lg">
         <form onSubmit={save} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><label className="label">Full Name *</label><input className="input" value={form.name} onChange={f('name')} required /></div>
@@ -101,6 +102,7 @@ export default function Owners() {
             <div className="col-span-2"><label className="label">Bank Account / IBAN</label><input className="input font-mono text-sm" value={form.bank_account} onChange={f('bank_account')} /></div>
             <div className="col-span-2"><label className="label">Notes</label><textarea className="input resize-none h-16" value={form.notes} onChange={f('notes')} /></div>
           </div>
+          {editId && <AttachmentSection entityType="owner" entityId={editId} />}
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={() => setModal(false)} className="btn-secondary">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Saving…' : editId ? 'Save' : 'Add Owner'}</button>

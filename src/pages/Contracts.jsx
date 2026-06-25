@@ -5,8 +5,9 @@ import { fmtCurrency, fmt, statusStyle, CURRENCIES } from '../utils/helpers'
 import { differenceInDays, parseISO, format } from 'date-fns'
 import Modal from '../components/Modal'
 import Confirm from '../components/Confirm'
-import { Plus, Search, FileText, XCircle, Eye, AlertTriangle, Pencil } from 'lucide-react'
+import { Plus, Search, FileText, XCircle, Eye, AlertTriangle, Pencil, Paperclip } from 'lucide-react'
 import toast from 'react-hot-toast'
+import AttachmentSection from '../components/AttachmentSection'
 
 const blank = {
   unit_id: '', tenant_id: '', start_date: '', end_date: '',
@@ -396,32 +397,35 @@ export default function Contracts() {
       </Modal>
 
       {/* ── VIEW MODAL ─────────────────────────── */}
-      <Modal isOpen={!!viewModal} onClose={() => setViewModal(null)} title="Contract Details">
+      <Modal isOpen={!!viewModal} onClose={() => setViewModal(null)} title="Contract Details" size="lg">
         {viewModal && (
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              ['Unit',         `${viewModal.units?.unit_number} · Block ${viewModal.units?.building}`],
-              ['Tenant',        viewModal.tenants?.name],
-              ['Tenant Phone',  viewModal.tenants?.phone],
-              ['Status',        <span className={statusStyle.contract[viewModal.status]}>{viewModal.status}</span>],
-              ['Start',         fmt(viewModal.start_date)],
-              ['End',           viewModal.end_date ? fmt(viewModal.end_date) : 'Open-ended'],
-              ['Monthly Rent',  fmtCurrency(viewModal.monthly_rent, viewModal.currency)],
-              ['Payment Day',   `${viewModal.payment_day}th of month`],
-              ['Deposit',       viewModal.deposit ? fmtCurrency(viewModal.deposit, viewModal.currency) : 'None'],
-              ['Deposit Paid',  viewModal.deposit_paid ? '✓ Yes' : '—'],
-            ].map(([l, v]) => (
-              <div key={l} className="bg-slate-50 rounded-lg p-3">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{l}</p>
-                <p className="text-sm text-slate-700 font-medium">{v || '—'}</p>
-              </div>
-            ))}
-            {viewModal.notes && (
-              <div className="col-span-2 bg-slate-50 rounded-lg p-3">
-                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Notes</p>
-                <p className="text-sm text-slate-600">{viewModal.notes}</p>
-              </div>
-            )}
+          <div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['Unit',         `${viewModal.units?.unit_number} · Block ${viewModal.units?.building}`],
+                ['Tenant',        viewModal.tenants?.name],
+                ['Tenant Phone',  viewModal.tenants?.phone],
+                ['Status',        <span className={statusStyle.contract[viewModal.status]}>{viewModal.status}</span>],
+                ['Start',         fmt(viewModal.start_date)],
+                ['End',           viewModal.end_date ? fmt(viewModal.end_date) : 'Open-ended'],
+                ['Monthly Rent',  fmtCurrency(viewModal.monthly_rent, viewModal.currency)],
+                ['Payment Day',   `${viewModal.payment_day}th of month`],
+                ['Deposit',       viewModal.deposit ? fmtCurrency(viewModal.deposit, viewModal.currency) : 'None'],
+                ['Deposit Paid',  viewModal.deposit_paid ? '✓ Yes' : '—'],
+              ].map(([l, v]) => (
+                <div key={l} className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">{l}</p>
+                  <p className="text-sm text-slate-700 font-medium">{v || '—'}</p>
+                </div>
+              ))}
+              {viewModal.notes && (
+                <div className="col-span-2 bg-slate-50 rounded-lg p-3">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Notes</p>
+                  <p className="text-sm text-slate-600">{viewModal.notes}</p>
+                </div>
+              )}
+            </div>
+            <AttachmentSection entityType="contract" entityId={viewModal.id} />
           </div>
         )}
       </Modal>
