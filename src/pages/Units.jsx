@@ -33,7 +33,7 @@ export default function Units() {
   useEffect(() => { load() }, [])
 
   const openAdd = () => { setForm(blank); setEditId(null); setModal(true) }
-  const openEdit = (u) => { setForm({ ...u, floor: u.floor ?? '', size_sqm: u.size_sqm ?? '', owner_id: u.owner_id ?? '' }); setEditId(u.id); setModal(true) }
+  const openEdit = (u) => { setForm({ unit_number: u.unit_number || '', building: u.building || '', floor: u.floor ?? '', type: u.type || '1+1', size_sqm: u.size_sqm ?? '', status: u.status || 'vacant', owner_id: u.owner_id ?? '', notes: u.notes || '' }); setEditId(u.id); setModal(true) }
 
   const save = async (e) => {
     e.preventDefault()
